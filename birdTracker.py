@@ -52,7 +52,7 @@ class BirdTracker:
                     img0, img1, p1, None, **lk_params
                 )
                 d = abs(p0 - p0r).reshape(-1, 2).max(-1)
-                good = d < 30  # NOTE: bigger number for fater bird
+                good = d[(d < 50) & (d > 2)]  # NOTE: bigger number for faster bird
                 new_tracks = []
 
                 for track, (x, y), good_flag in zip(
