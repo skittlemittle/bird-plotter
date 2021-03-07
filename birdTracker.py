@@ -3,7 +3,10 @@
 
 import cv2
 import numpy as np
+import serial
 import sys
+import threading
+import queue
 
 # config
 feature_params = dict(maxCorners=200, qualityLevel=0.3, minDistance=7, blockSize=7)
@@ -12,21 +15,47 @@ lk_params = dict(
     maxLevel=2,
     criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
 )
+rawPaths = queue.Queue()
+pathMap = {}  # the current paths, excuse the stupid naming
+
+# runs on a separate thread and keeps drawin
+def plot():
+    while True:
+        lines = rawPaths.get()
+        lKeys = []
+        # update
+        for l in lines:
+            pathMap[l[0]] = l
+            lKeys.append(l[0])
+            print(l[0])
+        print("")
+
+        # send "finished" lines to be plotted
+        r = []
+        for k in pathMap:
+            if not (k in lKeys):
+                print("drawing", k)
+                serialPort.write(pathMap[k])
+                r.append(k)
+
+        for i in r:
+            pathMap.pop(i)
 
 
 class BirdTracker:
-    def __init__(self, video_src, draw: bool):
+    def __init__(self, video_src, rawPaths: queue, draw: bool):
         self.cap = cv2.VideoCapture(video_src)
+        self.draw = draw
+        self.rawPaths = rawPaths
+
         self.find_features_interval = 5
         self.frame_count = 0
+        self.birdSpeed = [50, 2]  # bigger number for faster bird
         self.tracks = []
-
-        self.draw = draw
-        self.colors = np.random.randint(0, 255, (500, 3))
 
     def _draw(self, frame, lines: list):
         cv2.polylines(frame, [np.int32(l) for l in lines], False, (55, 200, 243), 2)
-        cv2.imshow("osas", frame)
+        cv2.imshow("", frame)
 
     def toggle_draw(self):
         self.draw = not self.draw
@@ -34,6 +63,8 @@ class BirdTracker:
     def track(self):
         while True:
             _ret, frame = self.cap.read()
+            if not _ret:
+                break
             frame = cv2.resize(
                 frame, (0, 0), fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR
             )
@@ -52,7 +83,7 @@ class BirdTracker:
                     img0, img1, p1, None, **lk_params
                 )
                 d = abs(p0 - p0r).reshape(-1, 2).max(-1)
-                good = d[(d < 50) & (d > 2)]  # NOTE: bigger number for faster bird
+                good = d[(d < self.birdSpeed[0]) & (d > self.birdSpeed[1])]
                 new_tracks = []
 
                 for track, (x, y), good_flag in zip(
@@ -60,11 +91,11 @@ class BirdTracker:
                 ):
                     if not good_flag:
                         continue
-
                     track.append((x, y))
                     new_tracks.append(track)
 
                 self.tracks = new_tracks
+                self.rawPaths.put(self.tracks)
                 if self.draw:
                     self._draw(vis, self.tracks)
 
@@ -91,7 +122,13 @@ class BirdTracker:
 if __name__ == "__main__":
     try:
         video = sys.argv[1]
+        port = sys.argv[2]
     except:
         video = "cropped.mp4"
-    BirdTracker(video, True).track()
+        port = "/dev/USB0"
+
+    serialPort = serial.Serial(port, 115200, timeout=10)
+    p = threading.Thread(target=plot, daemon=True)
+    p.start()
+    BirdTracker(video, rawPaths, True).track()
     cv2.destroyAllWindows()
