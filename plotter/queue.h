@@ -22,8 +22,7 @@ struct point {
 };
 
 /*
- * Queue to hold float lines
- * each point in a line is just a float[DIMENSION] = {x, y, ..., k};
+ * Queue to hold lines
  */
 class LineQueue {
   public:
