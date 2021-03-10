@@ -22,7 +22,7 @@ struct point {
 };
 
 /*
- * Queue to hold lines
+ * Queue to hold lines as sets of points
  */
 class LineQueue {
   public:
@@ -34,13 +34,19 @@ class LineQueue {
         size = 0;
         index = 0;
     }
-    ~LineQueue() { delete[] q; }
+    ~LineQueue()
+    {
+        for (int i = 0; i < size; i++)
+            delete &q[i];
+        delete[] q;
+    }
 
   private:
     point *q = nullptr;
     int qlen;
     int size;
     int index;
+    float EMPTY = -1.0f;
 
   public:
     void enqueue(const point &it);
@@ -50,11 +56,13 @@ class LineQueue {
 
 void LineQueue::enqueue(const point &it)
 {
-    if (size + index >= qlen)
+    if (size + index >= qlen) {
         Serial.println("WARN: queue full not adding this");
-
-    q[size + index] = point(it.x, it.y); // you didnt see anything
-    size++;
+    }
+    else {
+        q[size + index] = it;
+        size++;
+    }
 }
 
 point LineQueue::dequeue()
@@ -63,9 +71,7 @@ point LineQueue::dequeue()
         Serial.println("ERR: cannot dequeue an empty queue");
 
     point ret = q[index];
-
-    q[index].x = -1.0f;
-    q[index].y = -1.0f;
+    delete &q[index];
     index++;
     size--;
     return ret;
