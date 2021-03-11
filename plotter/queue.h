@@ -2,6 +2,7 @@
 #define QUEUE_H
 
 #include "Arduino.h"
+#include <new>
 #include <string.h>
 
 #define DIMENSION 2 // length of each point array
@@ -22,19 +23,20 @@ struct point {
 };
 
 /*
- * Queue to hold lines as sets of points
+ * Fixed size Queue
  */
-class LineQueue {
+template <class T> class Queue {
   public:
     /* qSize: number of points in line*/
-    LineQueue(int qSize)
+    Queue(int qSize)
     {
-        q = new point[qSize];
+        q = new T[qSize];
         qlen = qSize;
         size = 0;
         index = 0;
     }
-    ~LineQueue()
+
+    ~Queue()
     {
         for (int i = 0; i < size; i++)
             delete &q[i];
@@ -42,19 +44,19 @@ class LineQueue {
     }
 
   private:
-    point *q = nullptr;
+    T *q = nullptr;
     int qlen;
     int size;
     int index;
     float EMPTY = -1.0f;
 
   public:
-    void enqueue(const point &it);
-    point dequeue();
+    void enqueue(const T &it);
+    T dequeue();
     bool isEmpty() { return size == 0; }
 };
 
-void LineQueue::enqueue(const point &it)
+template <typename T> void Queue<T>::enqueue(const T &it)
 {
     if (size + index >= qlen) {
         Serial.println("WARN: queue full not adding this");
@@ -65,12 +67,12 @@ void LineQueue::enqueue(const point &it)
     }
 }
 
-point LineQueue::dequeue()
+template <typename T> T Queue<T>::dequeue()
 {
     if (size == 0)
         Serial.println("ERR: cannot dequeue an empty queue");
 
-    point ret = q[index];
+    T ret = q[index];
     delete &q[index];
     index++;
     size--;
